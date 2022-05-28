@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package courierpb;
+
+message Parcel {
+  int64 id = 1;
+  string email = 2;
+  string phone = 3;
+  float weight = 4;
+}
+
+message ProcessParcelsRequest {
+  string Date = 1;
+  repeated Parcel parcels = 2;
+}
+
+message ProcessParcelsResponse{
+  string Message = 1;
+}
+
+service CourierService{
+  rpc ProcessParcels(stream ProcessParcelsRequest) returns (stream ProcessParcelsResponse) {};
+}
+

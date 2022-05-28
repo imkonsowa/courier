@@ -1,67 +1,55 @@
 package main
 
 import (
-	"encoding/csv"
-	"fmt"
+	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+
+	"courier/src/courierpb"
+	"courier/src/services/csv_parser/handlers"
 )
 
 func main() {
-	parser := gin.Default()
+	// construct new gin engine with recovery and logger middleware attached
+	engine := gin.Default()
 
-	parser.POST("/upload", func(context *gin.Context) {
-		file, _, err := context.Request.FormFile("file")
+	// disable tls for the gRPC server
+	opts := grpc.WithTransportCredentials(insecure.NewCredentials())
 
-		if err != nil {
-			context.JSON(http.StatusInternalServerError, gin.H{
-				"success": false,
-				"message": "Failed to process your request",
-			})
-			return
+	c, err := grpc.Dial("localhost:1997", opts)
+	if err != nil {
+		log.Fatalf("could not connect: %v", err)
+	}
+
+	client := courierpb.NewCourierServiceClient(c)
+
+	csvHandler := handlers.NewCsvHandler(client)
+
+	engine.POST("/upload", csvHandler.ProcessParcels)
+
+	shutdown := make(chan os.Signal)
+
+	srv := &http.Server{
+		Addr:    ":1996",
+		Handler: engine,
+	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			log.Fatalf("Failed to run a server. err: %v", err)
 		}
+	}()
 
-		if file == nil {
-			context.JSON(http.StatusUnprocessableEntity, gin.H{
-				"success": false,
-				"message": "File is missing!",
-			})
-			return
-		}
+	signal.Notify(shutdown, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT)
 
-		r := csv.NewReader(file)
-		r.ReuseRecord = true
+	<-shutdown
 
-		all, err := csv.NewReader(file).Read()
-
-		if len(all) == 0 {
-			context.JSON(http.StatusBadRequest, gin.H{
-				"success": false,
-				"message": "Empty files not allowed",
-			})
-			return
-		}
-
-		if len(all) == 0 {
-			context.JSON(http.StatusBadRequest, gin.H{
-				"success": false,
-				"message": "Empty files not allowed",
-			})
-			return
-		}
-
-		go func() {
-			// process the lines
-			fmt.Println("File lines", len(all))
-		}()
-
-		context.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"message": "Well received, Processing!",
-		})
-		return
-	})
-
-	parser.Run(":1996")
+	c.Close()
+	srv.Close()
 }
