@@ -4,15 +4,43 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 
-	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
-	grpc_recovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
+	grpcmiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
+	grpcrecovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 	"google.golang.org/grpc"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 
 	"courier/src/courierpb"
+	"courier/src/pkg/config"
+	"courier/src/services/courier/data/adapters"
+	"courier/src/services/courier/data/models"
+	grpcpkg "courier/src/services/courier/grpc"
 )
 
 func main() {
+	cfg := config.GetConfig()
+
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=GMT",
+		cfg.DB.Host,
+		cfg.DB.User,
+		cfg.DB.Password,
+		cfg.DB.Name,
+		cfg.DB.Port,
+		cfg.DB.SSlMode,
+	)
+	db, dbErr := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if dbErr != nil {
+		panic(fmt.Sprintf("failed to connect to DB; %s", dbErr))
+	}
+	migrateErr := db.AutoMigrate(&models.Parcel{})
+	if migrateErr != nil {
+		panic(fmt.Sprintf("failed to migrate; %s", migrateErr))
+	}
+
 	lis, err := net.Listen("tcp", "0.0.0.0:1997")
 	if err != nil {
 		log.Fatalf("TCP failed to listen, err: %v", err)
@@ -20,15 +48,16 @@ func main() {
 
 	server := grpc.NewServer(
 		grpc.StreamInterceptor(
-			grpc_middleware.ChainStreamServer(
-				grpc_recovery.StreamServerInterceptor(),
+			grpcmiddleware.ChainStreamServer(
+				grpcrecovery.StreamServerInterceptor(),
 			),
 		),
 	)
 
-	courierpb.RegisterCourierServiceServer(server, &Server{})
-
-	watchCat := make(chan string)
+	s := grpcpkg.NewServer(
+		adapters.NewParcelAdapter(db),
+	)
+	courierpb.RegisterCourierServiceServer(server, s)
 
 	go func() {
 		if err := server.Serve(lis); err != nil {
@@ -38,5 +67,15 @@ func main() {
 
 	fmt.Println("Listening and serving gRPC on :1997")
 
-	<-watchCat
+	shutdown := make(chan os.Signal)
+	signal.Notify(
+		shutdown,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGQUIT,
+	)
+	<-shutdown
+
+	server.GracefulStop()
+	lis.Close()
 }
