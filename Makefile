@@ -1,2 +1,8 @@
+all: up
+
 grpc-gen:
-	protoc src/courierpb/courier.proto --go_out=plugins=grpc:.
+	protoc courierpb/courier.proto --go_out=plugins=grpc:.
+
+up:
+	docker-compose build
+	docker-compose up -d

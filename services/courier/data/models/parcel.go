@@ -5,7 +5,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"courier/src/courierpb"
+	"courier/courierpb"
 )
 
 type Parcel struct {

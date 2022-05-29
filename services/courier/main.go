@@ -14,11 +14,11 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"courier/src/courierpb"
-	"courier/src/pkg/config"
-	"courier/src/services/courier/data/adapters"
-	"courier/src/services/courier/data/models"
-	grpcpkg "courier/src/services/courier/grpc"
+	"courier/courierpb"
+	"courier/pkg/config"
+	"courier/services/courier/data/adapters"
+	"courier/services/courier/data/models"
+	grpcpkg "courier/services/courier/grpc"
 )
 
 func main() {
@@ -70,9 +70,7 @@ func main() {
 	shutdown := make(chan os.Signal)
 	signal.Notify(
 		shutdown,
-		syscall.SIGHUP,
 		syscall.SIGINT,
-		syscall.SIGQUIT,
 	)
 	<-shutdown
 

@@ -11,8 +11,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"courier/src/courierpb"
-	"courier/src/services/csv_parser/handlers"
+	"courier/courierpb"
+	"courier/services/csv_parser/handlers"
 )
 
 func main() {

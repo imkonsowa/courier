@@ -3,7 +3,7 @@ package config
 import (
 	"sync"
 
-	"courier/src/pkg/env"
+	"courier/pkg/env"
 )
 
 var (
@@ -41,7 +41,7 @@ func construct() {
 				Password: env.String("POSTGRES_PASSWORD", "pass"),
 				Host:     env.String("POSTGRES_HOST", "localhost"),
 				Port:     env.String("POSTGRES_PORT", "5432"),
-				Name:     env.String("POSTGRES_DB", "drones"),
+				Name:     env.String("POSTGRES_DB", "courier"),
 				SSlMode:  env.String("POSTGRES_SSL", "disable"),
 			},
 			Server: struct {

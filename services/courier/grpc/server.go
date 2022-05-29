@@ -5,8 +5,9 @@ import (
 	"io"
 	"log"
 
-	"courier/src/courierpb"
-	"courier/src/services/courier/data/adapters"
+	"courier/courierpb"
+	"courier/services/courier/data/adapters"
+	"courier/services/courier/data/models"
 )
 
 type Server struct {
@@ -31,6 +32,16 @@ func (s *Server) ProcessParcels(stream courierpb.CourierService_ProcessParcelsSe
 			log.Fatalf("Error processing parcels stream from client, err: %v", err)
 			return err
 		}
+
+		var upsert []*models.Parcel
+		for _, parcel := range req.GetParcels() {
+			upsert = append(upsert, models.FromPb(parcel))
+		}
+		insert, err := s.ParcelAdapter.PatchInsert(upsert)
+		if err != nil {
+			return err
+		}
+		fmt.Println(fmt.Sprintf("Inserted rows count: %d", len(insert)))
 
 		replyErr := stream.Send(&courierpb.ProcessParcelsResponse{
 			Message: fmt.Sprintf("Received and processing: %d", req.GetParcels()[len(req.GetParcels())-1].GetId()),

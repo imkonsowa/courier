@@ -13,7 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"courier/src/courierpb"
+	"courier/courierpb"
 )
 
 type CsvHandler struct {

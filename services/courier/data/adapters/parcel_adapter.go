@@ -3,7 +3,7 @@ package adapters
 import (
 	"gorm.io/gorm"
 
-	"courier/src/services/courier/data/models"
+	"courier/services/courier/data/models"
 )
 
 type ParcelAdapter struct {
