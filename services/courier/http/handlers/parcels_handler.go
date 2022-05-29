@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"courier/pkg/responses"
 	"courier/services/courier/data/adapters"
 )
 
@@ -29,18 +30,20 @@ func NewParcelHandler(adapter *adapters.ParcelAdapter) *ParcelHandler {
 func (p *ParcelHandler) GenerateCargoReport(context *gin.Context) {
 	day := context.Query("day")
 	if len(day) == 0 {
-		context.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"message": "The day to generate report for is missing",
-		})
+		responses.NewContextResponse(context).
+			Error().
+			Code(http.StatusBadRequest).
+			Message("The day to generate report for is missing").
+			Send()
 		return
 	}
 	parsedDay, parsedDayErr := time.Parse("2006-01-02", day)
 	if parsedDayErr != nil {
-		context.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"message": "Invalid day value sent",
-		})
+		responses.NewContextResponse(context).
+			Error().
+			Code(http.StatusBadRequest).
+			Message("Invalid day value sent").
+			Send()
 		return
 	}
 

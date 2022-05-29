@@ -39,11 +39,10 @@ func (s *Server) ProcessParcels(stream courierpb.CourierService_ProcessParcelsSe
 		for _, parcel := range req.GetParcels() {
 			upsert = append(upsert, models.FromPb(parcel, &date))
 		}
-		insert, err := s.ParcelAdapter.PatchInsert(upsert)
+		_, err = s.ParcelAdapter.PatchInsert(upsert)
 		if err != nil {
 			return err
 		}
-		fmt.Println(fmt.Sprintf("Inserted rows count: %d", len(insert)))
 
 		replyErr := stream.Send(&courierpb.ProcessParcelsResponse{
 			Message: fmt.Sprintf("Received and processing: %d", req.GetParcels()[len(req.GetParcels())-1].GetId()),

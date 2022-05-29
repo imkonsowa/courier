@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"courier/courierpb"
+	"courier/pkg/responses"
 	"courier/services/csv_parser/utils"
 )
 
@@ -33,27 +34,30 @@ func (h *CsvHandler) ProcessParcels(c *gin.Context) {
 	file, header, err := c.Request.FormFile("file")
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"message": "Failed to process your request",
-		})
+		responses.NewContextResponse(c).
+			Error().
+			Code(http.StatusInternalServerError).
+			Message("Failed to process your request").
+			Send()
 		return
 	}
 
 	if file == nil {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{
-			"success": false,
-			"message": "File is missing!",
-		})
+		responses.NewContextResponse(c).
+			Error().
+			Code(http.StatusBadRequest).
+			Message("File is missing!").
+			Send()
 		return
 	}
 
 	all, err := csv.NewReader(file).ReadAll()
 	if len(all) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"message": "Empty files not allowed",
-		})
+		responses.NewContextResponse(c).
+			Error().
+			Code(http.StatusBadRequest).
+			Message("Empty files not allowed").
+			Send()
 		return
 	}
 
@@ -66,11 +70,10 @@ func (h *CsvHandler) ProcessParcels(c *gin.Context) {
 		}
 	}()
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "Well received, Processing!",
-	})
-	return
+	responses.NewContextResponse(c).
+		Success().
+		Message("Well received, Processing!").
+		Send()
 }
 
 func (h *CsvHandler) processLines(lines [][]string) error {
