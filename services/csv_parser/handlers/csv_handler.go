@@ -14,7 +14,10 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"courier/courierpb"
+	"courier/services/csv_parser/utils"
 )
+
+const ChunkToProcessThreshold = 1000
 
 type CsvHandler struct {
 	client courierpb.CourierServiceClient
@@ -45,17 +48,7 @@ func (h *CsvHandler) ProcessParcels(c *gin.Context) {
 		return
 	}
 
-	// ReadAll instead of Reading line by line eliminates the complexity
-	// As one file is received daily to the service, it will not a memory critical issue.
 	all, err := csv.NewReader(file).ReadAll()
-	if len(all) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"message": "Empty files not allowed",
-		})
-		return
-	}
-
 	if len(all) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
@@ -66,7 +59,12 @@ func (h *CsvHandler) ProcessParcels(c *gin.Context) {
 
 	fmt.Println("Start processing file:", header.Filename)
 
-	go h.processLines(all)
+	go func() {
+		err := h.processLines(all)
+		if err != nil {
+			log.Printf(err.Error())
+		}
+	}()
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -75,80 +73,121 @@ func (h *CsvHandler) ProcessParcels(c *gin.Context) {
 	return
 }
 
-func (h *CsvHandler) processLines(lines [][]string) {
+func (h *CsvHandler) processLines(lines [][]string) error {
+	// drop the header
+	lines = lines[1:]
+
 	stream, streamErr := h.client.ProcessParcels(context.Background())
 	if streamErr != nil {
-		return
+		return fmt.Errorf("failed to open a stream connection with courier service, err: %v", streamErr)
 	}
 
-	start := 1
-	end := 1000
+	// a flag to indicate how many routine workers coordinating in sending data over the stream
+	var chunksCount = 0
+	chunksCount = len(lines) / ChunkToProcessThreshold
+	if len(lines)-(chunksCount*ChunkToProcessThreshold) > 0 {
+		chunksCount++
+	}
 
-	for {
+	// worker coordinators channels
+	lch := make(chan [][]string, chunksCount)
+	sendch := make(chan interface{}, chunksCount)
+
+	// ignite 10 workers to send chunks over the stream
+	for i := 0; i < 10; i++ {
+		go streamWorker(stream, lch, sendch)
+	}
+
+	for i := 1; i <= chunksCount; i++ {
+		end := i * ChunkToProcessThreshold
+		start := end - ChunkToProcessThreshold
+
+		// safe check to mitigate out of range exception
 		if end >= len(lines) {
-			end = len(lines) - 1
+			end = len(lines)
 		}
 
-		payload := lines[start:end]
-
-		var parcels []*courierpb.Parcel
-		for _, parcel := range payload {
-			id, err := strconv.Atoi(removeSpaces(parcel[0]))
-			if err != nil {
-				continue
-			}
-			weight, weightErr := strconv.ParseFloat(removeSpaces(parcel[3]), 8)
-			if weightErr != nil {
-				continue
-			}
-
-			parcels = append(parcels, &courierpb.Parcel{
-				Id:     int64(id),
-				Email:  parcel[1],
-				Phone:  parcel[2],
-				Weight: float32(weight),
-			})
-		}
-
-		request := &courierpb.ProcessParcelsRequest{
-			Date:    time.Now().Format("2006-01-02"),
-			Parcels: parcels,
-		}
-
-		err := stream.Send(request)
-		if err != nil {
-			return
-		}
-
-		if end >= len(lines)-1 {
-			break
-		}
-
-		end += 1000
-		start += 1000
+		// reinitialize payload to avoid cap increase
+		var payload [][]string
+		payload = append(payload, lines[start:end]...)
+		lch <- payload
 	}
 
+	// no more payloads to process
+	close(lch)
+
+	// a channel to block till all
 	waitc := make(chan struct{})
+
 	go func() {
-		// function to receive a bunch of messages
 		for {
 			res, err := stream.Recv()
 			if err == io.EOF {
 				break
 			}
 			if err != nil {
-				log.Fatalf("Error while receiving: %v", err)
+				log.Printf("Error while receiving: %v", err)
+				break
 			}
 			fmt.Printf("Received: %v\n", res.GetMessage())
 		}
+
 		close(waitc)
 	}()
 
+	// assert that all chunks were sent
+	// TODO: add error reporting from workers?
+	for j := 0; j < chunksCount; j++ {
+		<-sendch
+	}
+	stream.CloseSend()
+
 	<-waitc
 
-	stream.CloseSend()
+	fmt.Println("Wait is over")
+
+	return nil
 }
 
-func removeSpaces(s string) string {
-	return strings.ReplaceAll(s, " ", "")
+func streamWorker(
+	stream courierpb.CourierService_ProcessParcelsClient,
+	linesChannel <-chan [][]string,
+	sendch chan<- interface{},
+) {
+	today := time.Now().Format("2006-01-02")
+
+	for payload := range linesChannel {
+		var parcels []*courierpb.Parcel
+
+		for _, parcel := range payload {
+			id, err := strconv.Atoi(utils.RemoveSpaces(parcel[0]))
+			if err != nil {
+				continue
+			}
+			weight, weightErr := strconv.ParseFloat(utils.RemoveSpaces(parcel[3]), 32)
+			if weightErr != nil {
+				continue
+			}
+
+			parcels = append(parcels, &courierpb.Parcel{
+				Id:      int64(id),
+				Email:   utils.RemoveSpaces(parcel[1]),
+				Phone:   strings.TrimSpace(parcel[2]),
+				Weight:  float32(weight),
+				Country: utils.CountryFromPhone(parcel[2]).String(),
+			})
+		}
+
+		request := &courierpb.ProcessParcelsRequest{
+			Date:    today,
+			Parcels: parcels,
+		}
+
+		err := stream.Send(request)
+		if err != nil {
+			log.Printf("failed send request to courier service, err: %v", err)
+		}
+
+		sendch <- nil
+	}
 }

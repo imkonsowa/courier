@@ -9,6 +9,8 @@ services:
       - "5432:5432"
     volumes:
       - data:/var/lib/postgresql/data
+    networks:
+      - default
   courier:
     build:
       context: .
@@ -20,6 +22,7 @@ services:
       - default
     ports:
       - "1997:1997"
+      - "1998:1998"
   csv_parser:
     build:
       context: .

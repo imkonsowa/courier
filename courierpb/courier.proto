@@ -7,6 +7,7 @@ message Parcel {
   string email = 2;
   string phone = 3;
   float weight = 4;
+  string country = 5;
 }
 
 message ProcessParcelsRequest {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"time"
 
 	"courier/courierpb"
 	"courier/services/courier/data/adapters"
@@ -29,13 +30,14 @@ func (s *Server) ProcessParcels(stream courierpb.CourierService_ProcessParcelsSe
 			return nil
 		}
 		if err != nil {
-			log.Fatalf("Error processing parcels stream from client, err: %v", err)
+			log.Printf("Error processing parcels stream from client, err: %v", err)
 			return err
 		}
 
+		date, _ := time.Parse("2006-01-02", req.GetDate())
 		var upsert []*models.Parcel
 		for _, parcel := range req.GetParcels() {
-			upsert = append(upsert, models.FromPb(parcel))
+			upsert = append(upsert, models.FromPb(parcel, &date))
 		}
 		insert, err := s.ParcelAdapter.PatchInsert(upsert)
 		if err != nil {
@@ -47,7 +49,7 @@ func (s *Server) ProcessParcels(stream courierpb.CourierService_ProcessParcelsSe
 			Message: fmt.Sprintf("Received and processing: %d", req.GetParcels()[len(req.GetParcels())-1].GetId()),
 		})
 		if replyErr != nil {
-			log.Fatalf("Failed to reply to the recieved parcels, err %v", replyErr)
+			log.Printf("Failed to reply to the recieved parcels, err %v", replyErr)
 			return replyErr
 		}
 	}

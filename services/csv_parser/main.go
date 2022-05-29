@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,19 +11,18 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"courier/courierpb"
+	"courier/pkg/env"
 	"courier/services/csv_parser/handlers"
 )
 
 func main() {
-	// construct new gin engine with recovery and logger middleware attached
 	engine := gin.Default()
 
-	// disable tls for the gRPC server
 	opts := grpc.WithTransportCredentials(insecure.NewCredentials())
 
-	c, err := grpc.Dial("localhost:1997", opts)
+	c, err := grpc.Dial(env.String("GRPC_HOST", "localhost:1997"), opts)
 	if err != nil {
-		log.Fatalf("could not connect: %v", err)
+		log.Panicf("could not connect: %v", err)
 	}
 
 	client := courierpb.NewCourierServiceClient(c)
@@ -35,21 +33,13 @@ func main() {
 
 	shutdown := make(chan os.Signal)
 
-	srv := &http.Server{
-		Addr:    ":1996",
-		Handler: engine,
+	if err := engine.Run(":1996"); err != nil {
+		log.Printf("Failed to run a server. err: %v", err)
 	}
-
-	go func() {
-		if err := srv.ListenAndServe(); err != nil {
-			log.Fatalf("Failed to run a server. err: %v", err)
-		}
-	}()
 
 	signal.Notify(shutdown, syscall.SIGHUP, syscall.SIGINT, syscall.SIGQUIT)
 
 	<-shutdown
 
 	c.Close()
-	srv.Close()
 }
