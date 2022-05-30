@@ -69,7 +69,7 @@ make up
 
 - This command builds each service into a standalone container
 - The SCV Parser service exposed over port `1996` and accessible via `http://localhost:1996`
-- The Courier service exposed
+- The Courier service exposed over port `1998` and accessible via `http://localhost:1998`
 
 ## API Endpoints
 
