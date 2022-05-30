@@ -35,7 +35,7 @@ func (r *contextResponse) Error() *contextResponse {
 }
 
 func (r *contextResponse) Success() *contextResponse {
-	r.success = false
+	r.success = true
 	if r.code == 0 {
 		r.code = http.StatusOK
 	}
