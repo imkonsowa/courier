@@ -15,10 +15,16 @@ import (
 
 	"courier/courierpb"
 	"courier/pkg/responses"
-	"courier/services/csv_parser/utils"
+	"courier/pkg/utils"
 )
 
 const ChunkToProcessThreshold = 1000
+
+type SendResult struct {
+	Error error
+	Start int64
+	End   int64
+}
 
 type CsvHandler struct {
 	client courierpb.CourierServiceClient
@@ -96,30 +102,33 @@ func (h *CsvHandler) processLines(lines [][]string) error {
 
 	// worker coordinators channels
 	lch := make(chan [][]string, chunksCount)
-	sendch := make(chan interface{}, chunksCount)
+	sendch := make(chan *SendResult, chunksCount)
 
 	// ignite 10 workers to send chunks over the stream
 	for i := 0; i < 10; i++ {
 		go streamWorker(stream, lch, sendch)
 	}
 
-	for i := 1; i <= chunksCount; i++ {
-		end := i * ChunkToProcessThreshold
-		start := end - ChunkToProcessThreshold
+	go func() {
+		for i := 1; i <= chunksCount; i++ {
+			end := i * ChunkToProcessThreshold
+			start := end - ChunkToProcessThreshold
 
-		// safe check to mitigate out of range exception
-		if end >= len(lines) {
-			end = len(lines)
+			// safe check to mitigate out of range exception
+			if end >= len(lines) {
+				end = len(lines)
+			}
+
+			// reinitialize payload to avoid cap increase
+			var payload [][]string
+			payload = append(payload, lines[start:end]...)
+
+			lch <- payload
 		}
 
-		// reinitialize payload to avoid cap increase
-		var payload [][]string
-		payload = append(payload, lines[start:end]...)
-		lch <- payload
-	}
-
-	// no more payloads to process
-	close(lch)
+		// no more payloads to process
+		close(lch)
+	}()
 
 	// a channel to block till all parcels sent
 	waitc := make(chan struct{})
@@ -140,11 +149,16 @@ func (h *CsvHandler) processLines(lines [][]string) error {
 		close(waitc)
 	}()
 
-	// TODO: add error reporting from workers?
-	for j := 1; j <= chunksCount; j++ {
-		<-sendch
-	}
-	stream.CloseSend()
+	go func() {
+		for j := 1; j <= chunksCount; j++ {
+			result := <-sendch
+			if result.Error != nil {
+				fmt.Printf("Error sending chunk => [start:%d-end:%d]\n", result.Start, result.End)
+			}
+		}
+
+		stream.CloseSend()
+	}()
 
 	<-waitc
 
@@ -156,7 +170,7 @@ func (h *CsvHandler) processLines(lines [][]string) error {
 func streamWorker(
 	stream courierpb.CourierService_ProcessParcelsClient,
 	linesChannel <-chan [][]string,
-	sendch chan<- interface{},
+	sendch chan<- *SendResult,
 ) {
 	today := time.Now().Format("2006-01-02")
 
@@ -192,6 +206,10 @@ func streamWorker(
 			log.Printf("failed send request to courier service, err: %v", err)
 		}
 
-		sendch <- nil
+		sendch <- &SendResult{
+			Error: err,
+			Start: parcels[0].Id,
+			End:   parcels[len(parcels)-1].Id,
+		}
 	}
 }

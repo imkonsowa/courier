@@ -1,6 +1,7 @@
 package adapters
 
 import (
+	"fmt"
 	"time"
 
 	"gorm.io/datatypes"
@@ -43,11 +44,23 @@ func (p *ParcelAdapter) Count(day *time.Time) int64 {
 	return count
 }
 
-func (p *ParcelAdapter) PaginatedParcels(day *time.Time, offset, limit int) ([]*models.Parcel, error) {
+func (p *ParcelAdapter) PaginatedParcels(day *time.Time, country string, offset, limit int) ([]*models.Parcel, error) {
+	if day == nil || day.IsZero() {
+		return nil, fmt.Errorf("valid date value is required")
+	}
+
 	var parcels []*models.Parcel
 
+	cond := &models.Parcel{
+		Date: datatypes.Date(*day),
+	}
+
+	if len(country) != 0 {
+		cond.Country = country
+	}
+
 	p.DB.
-		Where(&models.Parcel{Date: datatypes.Date(*day)}).
+		Where(cond).
 		Select("id, parcel_id, weight").
 		Offset(offset).
 		Limit(limit).

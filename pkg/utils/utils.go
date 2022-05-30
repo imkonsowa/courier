@@ -34,6 +34,24 @@ var countryPrefix = map[Country]string{
 	Uganda:     `256`,
 }
 
+var AllCountries = []Country{
+	Cameroon,
+	Ethiopia,
+	Morocco,
+	Mozambique,
+	Uganda,
+}
+
+func IsValidCountry(country string) bool {
+	for _, c := range AllCountries {
+		if Country(country) == c {
+			return true
+		}
+	}
+
+	return false
+}
+
 func CountryFromPhone(phone string) Country {
 	phone = strings.TrimSpace(phone)
 

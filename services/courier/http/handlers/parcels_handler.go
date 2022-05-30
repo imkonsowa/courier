@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"courier/pkg/responses"
+	"courier/pkg/utils"
 	"courier/services/courier/data/adapters"
 )
 
@@ -51,13 +52,23 @@ func (p *ParcelHandler) GenerateCargoReport(context *gin.Context) {
 		return
 	}
 
+	country := context.Query("country")
+	if !utils.IsValidCountry(country) {
+		responses.NewContextResponse(context).
+			Error().
+			Code(http.StatusBadRequest).
+			Message("Invalid country!").
+			Send()
+		return
+	}
+
 	guid, _ := uuid.NewRandom()
 	parcelsJsonFile := fmt.Sprintf("%s.json", guid)
 
 	// TODO: utilize concurrent fetching from db aka pagination.
 	total := int(p.ParcelAdapter.Count(&parsedDay))
 	var cargos []*Cargo
-	parcels, _ := p.ParcelAdapter.PaginatedParcels(&parsedDay, 0, total)
+	parcels, _ := p.ParcelAdapter.PaginatedParcels(&parsedDay, country, 0, total)
 	cargo := new(Cargo)
 
 	for _, parcel := range parcels {

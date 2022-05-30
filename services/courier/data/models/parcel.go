@@ -11,12 +11,12 @@ import (
 
 type Parcel struct {
 	gorm.Model
-	ParcelID int64 `gorm:"index:index_parcel_id"`
+	ParcelID int64 `gorm:"index:idx_parcel_id"`
 	Email    string
 	Phone    string
 	Weight   float64
-	Country  string
-	Date     datatypes.Date `gorm:"index:index_date"`
+	Country  string         `gorm:"index:idx_country"`
+	Date     datatypes.Date `gorm:"index:idx_date"`
 }
 
 func (Parcel) TableName() string {
