@@ -132,9 +132,14 @@ This request must have a `date` query param with the standard date format e.g `2
 It also may receive a `country` param to filter the parcels for a specific country only, 
 country must be one of `Cameroon, Ethiopia, Morocco, Mozambique, Uganda`
 
-#### request URL
+#### request URL with country
 
 `http://localhost:1998/cargo-file?day=2022-05-30&country=Ethiopia`
+
+#### request URL without country
+
+`http://localhost:1998/cargo-file?day=2022-05-30`
+
 
 #### Request Method
 
