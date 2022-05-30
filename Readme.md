@@ -40,7 +40,8 @@ This repo contains a solution for JUMIA hiring process task, It's basically cont
 - User send a CSV file contains rows of parcel details to the `CSV Parser` service.
 - The `CSV Parser` service parses the file, reads its data, detecting the parcel country and posting all rows to
   the `Courier` service over gRPC stream as chunks signed with the `day` data received at.
-- The `Courier` service receives the streamed chunks and stores it in the `parcels` table in Postgres DB named `courier`.
+- The `Courier` service receives the streamed chunks and stores it in the `parcels` table in Postgres DB named `courier`
+  .
 - The `Courier` service has an exposed endpoint where cargo manifest file should be generated through.
 
 ## Dependencies
@@ -62,7 +63,6 @@ To run the service, make sure you have Docker and Compose installed on your test
 ```shell
 make up
 ```
-
 
 > **Warning**: before running the below command please make sure that ports `5432`, `1996`, `1997` and `1998` are not
 > allocated.
@@ -90,7 +90,7 @@ Used to parse a csv file and persist its rows in the DB.
 
 #### Request example
 
-This endpoint expects a request multipart content type with one field which is `file` holds the CSV file.
+This endpoint expects a request with multipart content type with one field which is `file` holds the CSV file.
 
 #### Response examples
 
@@ -126,10 +126,11 @@ This endpoint expects a request multipart content type with one field which is `
 
 ### Generate Cargo JSON file
 
-This request simply generates a cargo json file for the parcels needs to be shipped for a date. 
+This request simply generates a cargo json file for the parcels needs to be shipped for a given date.
 
 This request must have a `date` query param with the standard date format e.g `2022-08-05`.  
-At also may receive a `country` param to filter the parcels for a specific country only
+It also may receive a `country` param to filter the parcels for a specific country only, 
+country must be one of `Cameroon, Ethiopia, Morocco, Mozambique, Uganda`
 
 #### request URL
 
