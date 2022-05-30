@@ -1,5 +1,5 @@
 <div align="center">
-<h3 align="center">Microservices proce</h3>
+<h3 align="center">Courier service -  Golang Monorepo with gRPC and docker</h3>
 </div>
 
 <details open>
