@@ -56,7 +56,7 @@ func (r *contextResponse) Send() {
 		if r.code >= 200 && r.code < 300 {
 			r.message = "operation done successfully"
 		} else {
-			r.message = "failed to process you request"
+			r.message = "failed to process your request"
 		}
 	}
 
