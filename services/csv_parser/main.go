@@ -7,25 +7,15 @@ import (
 	"syscall"
 
 	"github.com/gin-gonic/gin"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 
 	"courier/courierpb"
-	"courier/pkg/env"
 	"courier/services/csv_parser/handlers"
 )
 
 func main() {
 	engine := gin.Default()
 
-	opts := grpc.WithTransportCredentials(insecure.NewCredentials())
-
-	c, err := grpc.Dial(env.String("GRPC_HOST", "localhost:1997"), opts)
-	if err != nil {
-		log.Panicf("could not connect: %v", err)
-	}
-
-	client := courierpb.NewCourierServiceClient(c)
+	client, connection := courierpb.NewCourierClient()
 
 	csvHandler := handlers.NewCsvHandler(client)
 
@@ -41,5 +31,5 @@ func main() {
 
 	<-shutdown
 
-	c.Close()
+	connection.Close()
 }

@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/csv"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -39,20 +40,18 @@ func NewCsvHandler(c courierpb.CourierServiceClient) *CsvHandler {
 func (h *CsvHandler) ProcessParcels(c *gin.Context) {
 	file, header, err := c.Request.FormFile("file")
 
-	if err != nil {
-		responses.NewContextResponse(c).
-			Error().
-			Code(http.StatusInternalServerError).
-			Message("Failed to process your request").
-			Send()
-		return
-	}
-
-	if file == nil {
+	if errors.Is(err, http.ErrMissingFile) {
 		responses.NewContextResponse(c).
 			Error().
 			Code(http.StatusBadRequest).
 			Message("File is missing!").
+			Send()
+		return
+	} else if err != nil {
+		responses.NewContextResponse(c).
+			Error().
+			Code(http.StatusInternalServerError).
+			Message("Failed to process your request").
 			Send()
 		return
 	}
