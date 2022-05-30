@@ -36,8 +36,9 @@ var countryPrefix = map[Country]string{
 
 func CountryFromPhone(phone string) Country {
 	phone = strings.TrimSpace(phone)
-	// TODO: spend some more time investigating || fixing why not matching!
-	// Go regexes are slow anyway ^_____^
+
+	// TODO: check the provided regexes correctness, many numbers are not matching!
+	// HINT: Go regexes are slow anyway ^_____^
 
 	/*for country, regex := range countryRegex {
 		match, err := regexp.MatchString(regex, phone)

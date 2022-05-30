@@ -32,6 +32,17 @@ func (p *ParcelAdapter) PatchInsert(parcels []*models.Parcel) ([]*models.Parcel,
 	return parcels, nil
 }
 
+func (p *ParcelAdapter) Count(day *time.Time) int64 {
+	var count int64
+
+	p.DB.
+		Where(&models.Parcel{Date: datatypes.Date(*day)}).
+		Model(&models.Parcel{}).
+		Count(&count)
+
+	return count
+}
+
 func (p *ParcelAdapter) PaginatedParcels(day *time.Time, offset, limit int) ([]*models.Parcel, error) {
 	var parcels []*models.Parcel
 

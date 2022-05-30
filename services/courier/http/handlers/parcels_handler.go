@@ -2,11 +2,15 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"courier/pkg/responses"
 	"courier/services/courier/data/adapters"
@@ -47,11 +51,13 @@ func (p *ParcelHandler) GenerateCargoReport(context *gin.Context) {
 		return
 	}
 
-	const ParcelsJsonFile = "parcels-cargo.json"
+	guid, _ := uuid.NewRandom()
+	parcelsJsonFile := fmt.Sprintf("%s.json", guid)
 
-	parcels, _ := p.ParcelAdapter.PaginatedParcels(&parsedDay, 0, 1000000)
-
+	// TODO: utilize concurrent fetching from db aka pagination.
+	total := int(p.ParcelAdapter.Count(&parsedDay))
 	var cargos []*Cargo
+	parcels, _ := p.ParcelAdapter.PaginatedParcels(&parsedDay, 0, total)
 	cargo := new(Cargo)
 
 	for _, parcel := range parcels {
@@ -64,8 +70,22 @@ func (p *ParcelHandler) GenerateCargoReport(context *gin.Context) {
 		cargo.TotalWeight += int(parcel.Weight)
 	}
 
-	file, _ := json.MarshalIndent(cargos, "", " ")
-	_ = ioutil.WriteFile("parcels-cargo.json", file, 0644)
+	// append the last cargo set
+	cargos = append(cargos, cargo)
 
-	context.FileAttachment("parcels-cargo.json", "parcels-cargo.json")
+	exportPayload := map[string][]*Cargo{
+		"cargos": cargos,
+	}
+
+	file, _ := json.MarshalIndent(exportPayload, "", "  ")
+	_ = ioutil.WriteFile(parcelsJsonFile, file, 0644)
+
+	context.FileAttachment(parcelsJsonFile, parcelsJsonFile)
+
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			log.Printf("failed to remove generated file: %s", parcelsJsonFile)
+		}
+	}(parcelsJsonFile)
 }

@@ -85,10 +85,12 @@ func (h *CsvHandler) processLines(lines [][]string) error {
 		return fmt.Errorf("failed to open a stream connection with courier service, err: %v", streamErr)
 	}
 
-	// a flag to indicate how many routine workers coordinating in sending data over the stream
+	// a flag to indicate how many chunks expected to be sent over the stream.
 	var chunksCount = 0
 	chunksCount = len(lines) / ChunkToProcessThreshold
-	if len(lines)-(chunksCount*ChunkToProcessThreshold) > 0 {
+	if chunksCount < 0 {
+		chunksCount = 1
+	} else if len(lines)-(chunksCount*ChunkToProcessThreshold) > 0 {
 		chunksCount++
 	}
 
@@ -119,7 +121,7 @@ func (h *CsvHandler) processLines(lines [][]string) error {
 	// no more payloads to process
 	close(lch)
 
-	// a channel to block till all
+	// a channel to block till all parcels sent
 	waitc := make(chan struct{})
 
 	go func() {
@@ -138,9 +140,8 @@ func (h *CsvHandler) processLines(lines [][]string) error {
 		close(waitc)
 	}()
 
-	// assert that all chunks were sent
 	// TODO: add error reporting from workers?
-	for j := 0; j < chunksCount; j++ {
+	for j := 1; j <= chunksCount; j++ {
 		<-sendch
 	}
 	stream.CloseSend()
